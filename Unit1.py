@@ -8,6 +8,10 @@ from colorizator import MangaColorizator
 import tempfile
 import time
 import cv2
+import zipfile
+import rarfile
+import py7zr
+import io
 
 CUDA_AVAILABLE = torch.cuda.device_count() > 0
 colorizer = MangaColorizator('cuda', 'networks/generator.zip', 'networks/extractor.pth')
@@ -30,26 +34,31 @@ class mainForm(Form):
 
     def __init__(self, owner):
         self.Panel1 = None
+        self.ListBox1 = None
+        self.btnColorizw = None
         self.StatusBar1 = None
-        self.StyleBook1 = None
         self.Panel2 = None
         self.edInputDir = None
         self.btnDirPath = None
-        self.ImageViewer1 = None
-        self.ListBox1 = None
         self.chkGrayFirst = None
-        self.Splitter1 = None
         self.Label1 = None
         self.Label2 = None
         self.edOutputDir = None
         self.btnOutPath = None
-        self.ProgressBar1 = None
         self.chkBlendGray = None
         self.chkUpscale = None
         self.lblGPU = None
-        self.btnColorizw = None
+        self.ProgressBar1 = None
+        self.ImageViewer1 = None
         self.ImageViewer2 = None
-        self.ScrollBox1 = None
+        self.Splitter1 = None
+        self.StyleBook1 = None
+        self.TabControl1 = None
+        self.TabItem1 = None
+        self.TabItem2 = None
+        self.TabItem3 = None
+        self.Panel3 = None
+        self.Panel4 = None
         self.LoadProps(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Unit1.pyfmx"))
 
         self.btnDirPath.OnClick = self.__dirClick
@@ -59,6 +68,8 @@ class mainForm(Form):
             gpu_info = torch.cuda.get_device_properties(0)
             self.lblGPU.SetProps(width=400, AutoSize=True)
             self.lblGPU.Text = f"{gpu_info.name} {gpu_info.total_memory / 1024**3:.2f} GB"
+        else:
+            self.lblGPU.Text = "No CUDA"
 
         self.btnColorizw.OnClick = self.__colorize
 
@@ -76,6 +87,7 @@ class mainForm(Form):
         file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
         if os.path.exists(file):
             self.ImageViewer1.Bitmap.LoadFromFile(file)
+            self.ImageViewer1.SetProps(BitmapScale=1.0)
 
     def __colorize(self, sender):
         file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
