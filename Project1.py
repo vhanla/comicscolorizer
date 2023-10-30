@@ -1,4 +1,4 @@
-from delphifmx import *
+from delphifmx import Application
 from Unit1 import mainForm
 
 def main():
