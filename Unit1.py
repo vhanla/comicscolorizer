@@ -14,6 +14,7 @@ import py7zr
 import io
 from scipy.interpolate import UnivariateSpline
 import threading
+from enum import Enum
 
 CUDA_AVAILABLE = torch.cuda.device_count() > 0
 colorizer = None
@@ -22,6 +23,12 @@ colorizer = None
 DESGREENS = 1
 DESREDS = 2
 DESBLUES = 4
+
+# App Mode
+class AppMode(Enum):
+    COMICBOOK = 1
+    DIRECTORY = 2
+    IMAGEONLY = 3
 
 def sepia(img):
     img_sepia = np.array(img, dtype=np.float64) # converting to float to prevent loss
@@ -82,6 +89,11 @@ def pastel(input, factor=1.5):
 class mainForm(Form):
 
     def __init__(self, owner):
+        self.__sm = StyleManager()
+        self.__sm.SetStyleFromFile(os.path.join(os.getcwd(), "styles/Dark.style"))
+
+        self.AppMode = None
+
         self.Panel1 = None
         self.ListBox1 = None
         self.StatusBar1 = None
@@ -129,7 +141,7 @@ class mainForm(Form):
         self.OpenDialog1 = None
         self.LoadProps(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Unit1.pyfmx"))
 
-        self.btnDirPath.OnClick = self.__dirClick
+        self.btnDirPath.OnClick = self.__openDirectory
         self.ListBox1.OnClick = self.__listClick
 
         if CUDA_AVAILABLE:
@@ -146,11 +158,40 @@ class mainForm(Form):
         self.ImageViewer1.OnMouseWheel = self.__viewresize
         self.ImageViewer1.OnHScrollChange = self.__scrolling
         self.ImageViewer1.OnVScrollChange = self.__scrolling
+
         # current image file
         self.curimg = None
         self.curlineart = None
         self.curcolored = None
         #self.SetProps(position=4)
+        self.ImageViewer1.BackgroundFill.Color = 0.0
+        self.ImageViewer2.BackgroundFill.Color = 0.0
+
+        # archives
+        self.fArchiveFile = None
+        self.btnOpenArch.OnClick = self.__openArchive
+
+    def __openArchive(self, sender):
+        self.OpenDialog1.Title = "Select a comic archive file."
+        self.OpenDialog1.Filter = "Comic Book files (*.cbr;*.cbz;*.cb7)|*.cbr;*.cbz;*.cb7|All files (*.*)|*.*"
+        #dir = askdirectory()
+        #root.destroy()
+        if self.OpenDialog1.Execute():
+            pictypes = ['.webp', '.png', '.jpeg', '.jpg']
+            self.fArchiveFile = self.OpenDialog1.FileName
+            comic_file = self.fArchiveFile
+            self.ListBox1.Clear();
+            if comic_file.endswith((".cbr")): # rar file
+                with rarfile.RarFile(comic_file) as cbr:
+                    for rarinfo in cbr.infolist():
+                        if any(rarinfo.filename.lower().endswith(ext) for ext in pictypes):
+                            self.ListBox1.Items.Add(rarinfo.filename)
+                    # rearrange the list
+                    self.ListBox1.Sorted = True
+                    if self.ListBox1.Items.Count > 0:
+                        self.AppMode = AppMode.COMICBOOK
+
+
 
     def __viewresize(self, sender, old, new, size):
         if self.ImageViewer2.Bitmap is not None:
@@ -268,6 +309,11 @@ class mainForm(Form):
             print("Getting lineart...")
             if self.swThreshold.IsChecked:
                 lineart = self.getlineart(self.curimg, round(self.tbThreshold.Value))
+
+                # CLAHE contrast enhancement 2.0
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                lineart = clahe.apply(lineart)
+
                 # translucent
                 #mask = cv2.bitwise_not(mask)
                 #alpha = cv2.cvtColor(lineart, cv2.COLOR_GRAY2BGRA)
@@ -317,7 +363,7 @@ class mainForm(Form):
     def __thresholdChange(self, sender):
         self.lbThreshold.Text = round(self.tbThreshold.Value)
 
-    def __dirClick(self, sender):
+    def __openDirectory(self, sender):
         #root = Tk()
         #root.withdraw()
         self.OpenDialog1.Title = "Select any picture file."
@@ -332,16 +378,44 @@ class mainForm(Form):
                 if filename.endswith((".jpg", ".jpeg", ".png", ".webp")):
                     image_path = os.path.join(dir, filename)
                     self.ListBox1.Items.Add(filename)
+            if self.ListBox1.Items.Count > 0:
+                self.AppMode = AppMode.DIRECTORY
 
     def __listClick(self, sender):
         if self.ListBox1.Items.Count > 0:
-            file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
-            if os.path.exists(file):
-                self.curimg = cv2.imread(file, cv2.IMREAD_UNCHANGED) #preload for other calls
-                if self.swThreshold.IsChecked:
-                    self.__thresholdPreview(sender)
-                else:
-                    self.ImageViewer1.Bitmap.LoadFromFile(file)
+            if self.AppMode == AppMode.COMICBOOK:
+                comic_file = self.fArchiveFile
+                stream = io.BytesIO()
+                file_to_extract = self.ListBox1.Items[self.ListBox1.ItemIndex]
+                #CBR
+                if comic_file.lower().endswith((".cbr")):
+                    with rarfile.RarFile(comic_file) as cbr:
+                        if file_to_extract in cbr.namelist():
+                            binary = cbr.open(file_to_extract)
+                            stream.write(binary.read())
+                            cbr.close()
+                            stream.seek(0)
+                            image_data = np.frombuffer(stream.read(), np.uint8)
+                            self.curimg = cv2.imdecode(image_data, cv2.IMREAD_UNCHANGED)
+                            if self.swThreshold.IsChecked:
+                                self.__thresholdPreview(sender)
+                            else:
+                                image_bytes = cv2.imencode('.bmp', self.curimg)[1].tobytes()
+                                self.ImageViewer1.Bitmap.LoadFromStream(BytesStream(image_bytes))
+
+
+            elif self.AppMode == AppMode.DIRECTORY:
+                file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
+                if os.path.exists(file):
+                    self.curimg = cv2.imread(file, cv2.IMREAD_UNCHANGED) #preload for other calls
+                    if self.swThreshold.IsChecked:
+                        self.__thresholdPreview(sender)
+                    else:
+                        self.ImageViewer1.Bitmap.LoadFromFile(file)
+            elif self.AppMode == AppMode.IMAGEONLY:
+                print("Reading a single image file")
+            else:
+                print("Invalid mode!")
 
 
     def hilo(self):
@@ -359,10 +433,12 @@ class mainForm(Form):
     def __colorize(self):
         global colorizer
 
-        file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
+        #file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
 
-        if os.path.exists(file):
-            input_image = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
+        #if os.path.exists(file):
+        if self.curimg is not None:
+            #input_image = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
+            input_image = cv2.cvtColor(self.curimg, cv2.COLOR_BGR2GRAY)
             h, w = input_image.shape[:2]
             _, mask = cv2.threshold(input_image, round(self.tbThreshold.Value), 255, cv2.THRESH_BINARY)
             kernel = np.ones((1,1), np.uint8)
