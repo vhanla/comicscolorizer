@@ -27,6 +27,8 @@ object mainForm: TmainForm
       DefaultItemStyles.GroupFooterStyle = ''
       Viewport.Width = 149.000000000000000000
       Viewport.Height = 339.000000000000000000
+      MultiSelectStyle = Default
+      AlternatingRowBackground = True
     end
   end
   object StatusBar1: TStatusBar
@@ -421,6 +423,10 @@ object mainForm: TmainForm
     TabOrder = 10
   end
   object OpenDialog1: TOpenDialog
+    Left = 288
+    Top = 184
+  end
+  object SaveDialog1: TSaveDialog
     Left = 288
     Top = 184
   end
