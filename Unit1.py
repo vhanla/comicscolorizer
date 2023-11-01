@@ -15,6 +15,8 @@ import io
 from scipy.interpolate import UnivariateSpline
 import threading
 from enum import Enum
+from pyora import Project, TYPE_LAYER
+from PIL import Image
 
 CUDA_AVAILABLE = torch.cuda.device_count() > 0
 colorizer = None
@@ -139,6 +141,7 @@ class mainForm(Form):
         self.swLineart = None
         self.lblLineartSw = None
         self.OpenDialog1 = None
+        self.SaveDialog1 = None
         self.LoadProps(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Unit1.pyfmx"))
 
         self.btnDirPath.OnClick = self.__openDirectory
@@ -151,7 +154,7 @@ class mainForm(Form):
         else:
             self.lblGPU.Text = "No CUDA"
 
-        self.btnColorize.OnClick = self.hilazo#__colorize
+        self.btnColorize.OnClick = self.saveasora # self.hilazo#__colorize
         self.tbThreshold.OnClick = self.__thresholdPreview
         self.swThreshold.OnClick = self.__thresholdPreview
         self.tbThreshold.OnChange = self.__thresholdChange
@@ -166,6 +169,9 @@ class mainForm(Form):
         #self.SetProps(position=4)
         self.ImageViewer1.BackgroundFill.Color = 0.0
         self.ImageViewer2.BackgroundFill.Color = 0.0
+
+        # directory
+        self.fDirectory = None # current directory opened
 
         # archives
         self.fArchiveFile = None
@@ -190,7 +196,34 @@ class mainForm(Form):
                     self.ListBox1.Sorted = True
                     if self.ListBox1.Items.Count > 0:
                         self.AppMode = AppMode.COMICBOOK
+                    self.edInputArch.Text = self.fArchiveFile
 
+    def saveasora(self, sender):
+        if self.curimg is not None:
+            if self.curlineart is not None:
+                h, w = self.curimg.shape[:2]
+                ora = Project.new(w, h)
+                if len(self.curimg.shape) == 2: # gray image
+                    pic = cv2.cvtColor(self.curimg, cv2.COLOR_GRAY2RGB)
+                elif len(self.curimg.shape) == 3: # bgr
+                    pic = cv2.cvtColor(self.curimg, cv2.COLOR_BGR2RGB)
+                else:
+                    pic = cv2.cvtColor(self.curimg, cv2.COLOR_BGRA2RGB)
+
+                if len(self.curlineart.shape) == 2: # gray image
+                    pig = cv2.cvtColor(self.curlineart, cv2.COLOR_GRAY2RGB)
+                elif len(self.curlineart.shape) == 3: # bgr
+                    pig = cv2.cvtColor(self.curlineart, cv2.COLOR_BGR2RGB)
+                else:
+                    pig = cv2.cvtColor(self.curlineart, cv2.COLOR_BGRA2RGB)
+
+                pil = Image.fromarray(pic)
+                ora.add_layer(pil, 'Root Level Layer')
+                pil = Image.fromarray(pig)
+                ora.add_layer(pil, 'Lineart')
+
+                if self.SaveDialog1.Execute():
+                    ora.save(self.SaveDialog1.FileName)
 
 
     def __viewresize(self, sender, old, new, size):
@@ -309,10 +342,10 @@ class mainForm(Form):
             print("Getting lineart...")
             if self.swThreshold.IsChecked:
                 lineart = self.getlineart(self.curimg, round(self.tbThreshold.Value))
-
+                self.curlineart = lineart
                 # CLAHE contrast enhancement 2.0
-                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                lineart = clahe.apply(lineart)
+                #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                #lineart = clahe.apply(lineart)
 
                 # translucent
                 #mask = cv2.bitwise_not(mask)
@@ -371,12 +404,13 @@ class mainForm(Form):
         #dir = askdirectory()
         #root.destroy()
         if self.OpenDialog1.Execute():
-            dir = os.path.dirname(self.OpenDialog1.FileName)
-            self.edInputDir.Text = dir
+            self.fDirectory = os.path.dirname(self.OpenDialog1.FileName)
+            cdir = self.fDirectory
+            self.edInputDir.Text = cdir
             self.ListBox1.Items.Clear()
-            for filename in os.listdir(dir):
+            for filename in os.listdir(cdir):
                 if filename.endswith((".jpg", ".jpeg", ".png", ".webp")):
-                    image_path = os.path.join(dir, filename)
+                    image_path = os.path.join(cdir, filename)
                     self.ListBox1.Items.Add(filename)
             if self.ListBox1.Items.Count > 0:
                 self.AppMode = AppMode.DIRECTORY
@@ -405,9 +439,11 @@ class mainForm(Form):
 
 
             elif self.AppMode == AppMode.DIRECTORY:
-                file = os.path.join(self.edInputDir.Text, self.ListBox1.Items[self.ListBox1.ItemIndex])
+                cdir = os.path.normpath(self.fDirectory)
+                file = os.path.join(cdir, self.ListBox1.Items[self.ListBox1.ItemIndex])
                 if os.path.exists(file):
-                    self.curimg = cv2.imread(file, cv2.IMREAD_UNCHANGED) #preload for other calls
+                    self.curimg = plt.imread(file) #this is better reading mode for certain images
+                    #self.curimg = cv2.imread(file, cv2.IMREAD_UNCHANGED) #preload for other calls
                     if self.swThreshold.IsChecked:
                         self.__thresholdPreview(sender)
                     else:
@@ -438,9 +474,16 @@ class mainForm(Form):
         #if os.path.exists(file):
         if self.curimg is not None:
             #input_image = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
-            input_image = cv2.cvtColor(self.curimg, cv2.COLOR_BGR2GRAY)
+            if len(self.curimg.shape) == 2:
+                input_image = self.curimg
+            else:
+                input_image = cv2.cvtColor(self.curimg, cv2.COLOR_BGR2GRAY)
             h, w = input_image.shape[:2]
-            _, mask = cv2.threshold(input_image, round(self.tbThreshold.Value), 255, cv2.THRESH_BINARY)
+
+            if self.chkBlendGray.IsChecked:
+                _, mask = cv2.threshold(input_image, round(self.tbThreshold.Value), 255, cv2.THRESH_BINARY)
+            else:
+                _, mask = cv2.threshold(input_image, 0, 255, cv2.THRESH_BINARY)
             kernel = np.ones((1,1), np.uint8)
             dilated_mask = cv2.dilate(mask, kernel, iterations=1)
             lineart = np.ones_like(input_image) * 255
@@ -467,11 +510,11 @@ class mainForm(Form):
             #image = image.astype('float32')
 
             resized_image = cv2.resize(colorized, (w, h))
+            self.curcolored = lineart
             resized_image = resized_image.astype('float32')
-            if self.chkBlendGray.IsChecked:
-                result = cv2.multiply(lineart, resized_image, dtype=cv2.CV_32F)
-            else:
-                result = cv2.multiply(resized_image, resized_image, dtype=cv2.CV_32F)
+
+            #blend with lineart
+            result = cv2.multiply(lineart, resized_image, dtype=cv2.CV_32F)
 
             result = result.astype('uint8')
 
