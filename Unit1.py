@@ -96,9 +96,40 @@ class mainForm(Form):
 
         self.AppMode = None
 
-        self.pnlList = None
-        self.ListBox1 = None
         self.StatusBar1 = None
+        self.lblGPU = None
+        self.pnlSettings = None
+        self.VertScrollBox1 = None
+        self.ExpandAfter = None
+        self.swLineart = None
+        self.lblLineartSw = None
+        self.chkUpscale = None
+        self.chkGrayFirst = None
+        self.chkBlendGray = None
+        self.Button13 = None
+        self.gbLineartAfter = None
+        self.Label14 = None
+        self.TrackBar1 = None
+        self.Switch1 = None
+        self.Label15 = None
+        self.ExpandBefore = None
+        self.GroupBox1 = None
+        self.RadioButton1 = None
+        self.RadioButton2 = None
+        self.RadioButton3 = None
+        self.GroupBox2 = None
+        self.Label7 = None
+        self.tbThreshold = None
+        self.swThreshold = None
+        self.lbThreshold = None
+        self.btnColorize = None
+        self.gpColorizator = None
+        self.SpinBox1 = None
+        self.SpinBox2 = None
+        self.ckDenoise = None
+        self.Label16 = None
+        self.ExpandSource = None
+        self.pnlSource = None
         self.TabControl1 = None
         self.TabItem1 = None
         self.Label3 = None
@@ -122,27 +153,11 @@ class mainForm(Form):
         self.Label6 = None
         self.edInputImg = None
         self.edOutputImg = None
-        self.pnlSettings = None
-        self.chkBlendGray = None
-        self.chkGrayFirst = None
-        self.chkUpscale = None
-        self.btnColorize = None
-        self.ProgressBar1 = None
-        self.swThreshold = None
-        self.Label7 = None
-        self.tbThreshold = None
-        self.lbThreshold = None
-        self.swLineart = None
-        self.lblLineartSw = None
         self.pnlViewer = None
-        self.ImageViewer1 = None
-        self.ImageViewer2 = None
         self.Splitter1 = None
-        self.lblGPU = None
-        self.OpenDialog1 = None
-        self.SaveDialog1 = None
-        self.Panel2 = None
-        self.Panel5 = None
+        self.btnSplitSync = None
+        self.ScrollBox1 = None
+        self.HorzScrollBox1 = None
         self.Panel6 = None
         self.Label8 = None
         self.Button1 = None
@@ -151,11 +166,13 @@ class mainForm(Form):
         self.Button4 = None
         self.Button5 = None
         self.Button6 = None
+        self.HorzScrollBox3 = None
         self.Panel7 = None
         self.Label9 = None
         self.Label10 = None
-        self.CheckBox2 = None
-        self.HorzScrollBox1 = None
+        self.pnlLeftImage = None
+        self.ImageViewer1 = None
+        self.ScrollBox2 = None
         self.HorzScrollBox2 = None
         self.Panel8 = None
         self.Label11 = None
@@ -165,16 +182,20 @@ class mainForm(Form):
         self.Button10 = None
         self.Button11 = None
         self.Button12 = None
-        self.HorzScrollBox3 = None
         self.HorzScrollBox4 = None
         self.Panel9 = None
         self.Label12 = None
         self.Label13 = None
+        self.pnlRightImage = None
+        self.ImageViewer2 = None
+        self.OpenDialog1 = None
+        self.SaveDialog1 = None
         self.Splitter2 = None
-        self.Panel1 = None
-        self.Panel4 = None
-        self.Panel10 = None
         self.Splitter3 = None
+        self.ExpandBatch = None
+        self.pnlList = None
+        self.ListBox1 = None
+        self.ProgressBar1 = None
         self.LoadProps(os.path.join(os.path.dirname(os.path.abspath(__file__)), "Unit1.pyfmx"))
 
         self.btnDirPath.OnClick = self.__openDirectory
@@ -210,7 +231,7 @@ class mainForm(Form):
         self.fArchiveFile = None
         self.btnOpenArch.OnClick = self.__openArchive
 
-        self.ListBox1.OnDragDrop = self.__dragdrop
+        #self.ListBox1.OnDragDrop = self.__dragdrop
 
     def __dragdrop(self, sender, data, point, operation):
         pass
