@@ -1,0 +1,3 @@
+[submodule "manga-colorization-v2"]
+	path = manga-colorization-v2
+	url = https://github.com/qweasdd/manga-colorization-v2.git
